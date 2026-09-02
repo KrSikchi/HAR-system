@@ -43,12 +43,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # 1. Install CPU-only torch/torchvision first so ultralytics never pulls the
-#    ~2.5 GB CUDA-family wheels from PyPI.
+#    ~2.5 GB CUDA-family wheels from PyPI.  Versions match requirements.lock
+#    (the demo-machine dependency set).
 RUN pip install --no-cache-dir \
         --index-url "${PYTORCH_INDEX_URL}" \
         --extra-index-url https://pypi.org/simple \
-        "torch" \
-        "torchvision"
+        "torch==2.14.0" \
+        "torchvision==0.29.0"
 
 # 2. Install the rest of the application's runtime dependencies.  torch is
 #    already satisfied, so this resolves ultralytics/opencv/numpy/etc. only.
