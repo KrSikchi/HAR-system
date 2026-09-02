@@ -1,0 +1,60 @@
+services:
+  har:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: har-system:latest
+    container_name: har-system
+    restart: unless-stopped
+    ports:
+      - "${HAR_HOST_PORT:-8080}:${HAR_STREAM_PORT:-8080}"
+    environment:
+      # Input / processing
+      HAR_SOURCE: ${HAR_SOURCE:-demo/correct.mp4}
+      HAR_PROTOCOL: ${HAR_PROTOCOL:-protocols/pts01.yaml}
+      HAR_COLOURS: ${HAR_COLOURS:-config/colours.yaml}
+      HAR_OUT_DIR: ${HAR_OUT_DIR:-/work/runs/latest}
+      HAR_DETECTOR: ${HAR_DETECTOR:-color}
+      HAR_WRISTS: ${HAR_WRISTS:-auto}
+      HAR_MAX_FRAMES: ${HAR_MAX_FRAMES:-0}
+      HAR_LOOP: ${HAR_LOOP:-1}
+      HAR_RECORD: ${HAR_RECORD:-0}
+      HAR_HEADLESS: ${HAR_HEADLESS:-0}
+      HAR_VOICE: ${HAR_VOICE:-0}
+      # HTTP
+      HAR_STREAM_HOST: 0.0.0.0
+      HAR_STREAM_PORT: ${HAR_STREAM_PORT:-8080}
+      # Extra CLI flags (shell-split, leave empty for defaults)
+      HAR_EXTRA_ARGS: ${HAR_EXTRA_ARGS:-}
+    volumes:
+      # Run artefacts (events.jsonl / events.csv / meta.json, recordings).
+      # This is a named volume so the non-root container user can always
+      # write to it.
+      - har-runs:/work/runs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os, sys, urllib.request; port=os.environ.get('HAR_STREAM_PORT','8080'); sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:%s/status' % port, timeout=3).status == 200 else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+    # --- Optional: use a host-mounted run output directory -----------------
+    # If you replace the named volume with a bind mount, the directory must be
+    # writable by the container's UID (default 10001).  For example:
+    #   mkdir -p ./runs && sudo chown -R 10001:10001 ./runs
+    # volumes:
+    #   - ./runs:/work/runs
+
+    # --- Optional: use a live camera instead of a video file ---------------
+    # Uncomment the `devices` block below and set HAR_SOURCE=0 in .env.
+    # devices:
+    #   - "/dev/video0:/dev/video0"
+
+volumes:
+  har-runs:

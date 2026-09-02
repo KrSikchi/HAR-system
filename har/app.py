@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 import threading
 import time
@@ -70,6 +71,19 @@ HAND_HSV_HI = (16, 190, 255)
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _raise_keyboard_interrupt(_signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
+def _install_sigterm_handler() -> None:
+    """Convert SIGTERM (Docker stop / compose down) into the existing
+    KeyboardInterrupt cleanup path so logs and recordings close cleanly."""
+    try:
+        signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
+    except (ValueError, OSError):  # non-main thread or unsupported platform
+        pass
 
 
 # --------------------------------------------------------------------------
@@ -521,6 +535,7 @@ def _start_web_server(streamer, status_provider, log_tail, spec, host: str, port
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
+    _install_sigterm_handler()
     if args.contract:
         print(CONTRACT_VERSION)
         return 0

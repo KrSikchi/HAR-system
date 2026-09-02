@@ -25,3 +25,6 @@ data/
 .vscode/
 .idea/
 .DS_Store
+
+# Local deployment configuration (see .env.example)
+.env

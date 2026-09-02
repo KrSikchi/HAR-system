@@ -24,6 +24,62 @@ Voice output needs a local TTS driver (offline, no cloud): SAPI5 on Windows,
 `espeak-ng` on Linux (`sudo apt install espeak-ng`). Without it the system still
 runs — alerts move to the on-screen banner and `--no-voice` silences the warning.
 
+## Deploy with Docker
+
+The repository ships a production-oriented Docker setup (CPU image by
+default; optional CUDA build).  It runs the full system as a long-lived
+service: it loops the shipped demo footage, serves the browser GUI + MJPEG
+stream on `0.0.0.0:8080`, and writes `events.jsonl` / `events.csv` /
+`meta.json` (plus recordings when enabled) to a persistent volume.
+
+```bash
+# Build and start
+cp .env.example .env          # optional, then edit anything you like
+docker compose up -d --build
+
+# Open the console
+#   http://localhost:8080
+# The stream is also available directly at /stream.
+
+# Inspect
+docker compose logs -f
+docker compose ps
+
+# Run artefacts live on a named volume (har-runs)
+docker compose exec har ls -l /work/runs/latest
+
+# Stop
+docker compose down           # add -v to also delete the run-volume
+```
+
+Everything the CLI accepts can be configured with environment variables
+(`.env.example` documents them).  The main ones:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `HAR_SOURCE` | `demo/correct.mp4` | `0` for a live camera, otherwise a file inside the image or mounted path |
+| `HAR_LOOP` | `1` | keep re-processing after the source ends so the service keeps running |
+| `HAR_RECORD` | `0` | record MP4s into the out-dir |
+| `HAR_VOICE` | `0` | enable offline TTS (`espeak-ng` is installed, but most headless hosts have no audio device) |
+| `HAR_DETECTOR` / `HAR_WRISTS` | `color` / `auto` | same as the CLI flags |
+| `HAR_EXTRA_ARGS` | (empty) | shell-splits extra CLI flags, e.g. `--imgsz 640 --conf 0.5` |
+| `HAR_HOST_PORT` | `8080` | host port mapping for the console |
+| `HAR_STREAM_PORT` | `8080` | container port the GUI/stream (and health check) listen on |
+
+Notes:
+
+* The image runs as a non-root user (`har`, UID 10001).  A bind-mount for the
+  run directory must be writable by that UID; the default `har-runs` named
+  volume is already set up for it.
+* To use a live camera, uncomment the `devices` block in
+  `docker-compose.yml` and set `HAR_SOURCE=0`.
+* Default build installs CPU-only PyTorch.  For a GPU image, build with a
+  CUDA PyTorch index, e.g.
+  `docker build --build-arg PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu124 -t har-system:cu124 .`
+  and enable GPU access in your compose override.
+* Docker builds resolve dependencies online; the committed `wheelhouse/`
+  remains the offline-without-Docker path described below.
+
 ## Run it (no camera needed)
 
 ```bash

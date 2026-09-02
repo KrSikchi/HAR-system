@@ -1,0 +1,28 @@
+# Version control and Python virtualenv noise
+.git/
+.gitignore
+.gitattributes
+.venv/
+**/__pycache__/
+**/*.py[cod]
+*.egg-info/
+
+# Local run artefacts - never package these into the image
+runs/
+logs/
+recordings/
+*.onnx
+*.engine
+*.tflite
+
+# Local/compose configuration
+.env
+
+# Machine-specific offline wheel store.  Docker builds resolve dependencies
+# from the configured index, so the committed wheelhouse README is sufficient.
+wheelhouse/*.whl
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
