@@ -395,6 +395,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
                         help="GUI/MJPEG bind host (default: 0.0.0.0; forces the server on even --headless)")
     parser.add_argument("--stream-port", default=None, type=int, metavar="PORT",
                         help="GUI/MJPEG port (default: 8080)")
+    parser.add_argument("--person-gate", action=argparse.BooleanOptionalAction, default=False,
+                        help="skip object detection on frames where pose sees no person "
+                             "(default: off - PTS-01 step 1 must detect the tray with nobody "
+                             "in frame)")
     parser.add_argument("--pose-every-n", default=1, type=int, metavar="N",
                         help="run pose on every Nth frame (default: 1)")
     parser.add_argument("--imgsz", default=480, type=int, metavar="N",
@@ -606,6 +610,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             spec.objects,
             frame_size,
             interaction_config=interaction_config,
+            person_gate=bool(args.person_gate),
         )
         validator = _make_validator(spec)
         detector_backend = getattr(detector, "backend", args.detector)

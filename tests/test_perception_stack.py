@@ -58,10 +58,27 @@ class PerceptionStackTests(unittest.TestCase):
         self.assertFalse(blue.measured)
         self.assertIsNone(blue.box)
 
-    def test_person_gate_skips_the_detector_when_nobody_is_in_frame(self):
+    def test_person_gate_is_off_by_default_so_props_are_detected_with_nobody_in_frame(self):
+        # PTS-01 step 1 (object_stable(tray)) is a prop-only dwell: the tray
+        # must be measured with zero people / zero wrists in frame.
         detector = FakeDetector()
         detector.detections = [Detection((100.0, 100.0, 140.0, 150.0), 0.9, "red_box")]
         stack = self._stack(detector, FakeWrists(person_present=False))
+        self.assertFalse(stack.person_gate)
+
+        for frame_index in range(6):
+            evidence = stack.process("frame", frame_index, frame_index / 15.0)
+        self.assertEqual(6, detector.calls)
+        self.assertEqual((), evidence.hands)
+        self.assertTrue(evidence.objects["red_box"].measured)
+        self.assertEqual((100.0, 100.0, 140.0, 150.0), evidence.objects["red_box"].box)
+
+    def test_person_gate_opt_in_skips_the_detector_when_nobody_is_in_frame(self):
+        detector = FakeDetector()
+        detector.detections = [Detection((100.0, 100.0, 140.0, 150.0), 0.9, "red_box")]
+        stack = PerceptionStack(
+            detector, FakeWrists(person_present=False), LABELS, FRAME_SIZE, person_gate=True
+        )
 
         for frame_index in range(6):
             evidence = stack.process("frame", frame_index, frame_index / 15.0)
@@ -72,6 +89,7 @@ class PerceptionStackTests(unittest.TestCase):
     def test_gate_passes_when_the_extractor_reports_a_person(self):
         detector = FakeDetector()
         stack = self._stack(detector, FakeWrists(person_present=True))
+        stack.person_gate = True
         stack.process("frame", 0, 0.0)
         self.assertEqual(1, detector.calls)
 
@@ -82,6 +100,7 @@ class PerceptionStackTests(unittest.TestCase):
 
         detector = FakeDetector()
         stack = self._stack(detector, WristsWithoutGate())
+        stack.person_gate = True
         stack.process("frame", 0, 0.0)
         self.assertEqual(1, detector.calls)
 

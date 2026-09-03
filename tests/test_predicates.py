@@ -195,5 +195,34 @@ class PredicateTests(unittest.TestCase):
         self.assertFalse(hands_clear(ev(objects={}, hands=[self.HAND_IN]), self.spec, s, st))
 
 
+
+
+class Step1LayoutTests(unittest.TestCase):
+    """Lid resting ON the tray must keep ``object_left_zone`` false."""
+
+    def test_lid_centre_inside_tray_slot_is_not_left(self):
+        # tray_slot is (200, 200, 440, 420); lid centre (320, 310) is inside.
+        lid = ObjectTrack(label="lid", box=(260.0, 250.0, 380.0, 370.0), measured=True)
+        st = PredicateState()
+        self.assertFalse(object_left_zone(
+            ev(objects={"lid": lid}), make_spec(), step("object_left_zone(lid, tray_slot)", "lid", "tray_slot"), st
+        ))
+
+    def test_lid_centre_outside_tray_slot_is_left(self):
+        # Slid horizontally clear: centre x = 520 > tray_slot x2 = 440.
+        lid = ObjectTrack(label="lid", box=(460.0, 250.0, 580.0, 370.0), measured=True)
+        st = PredicateState()
+        self.assertTrue(object_left_zone(
+            ev(objects={"lid": lid}), make_spec(), step("object_left_zone(lid, tray_slot)", "lid", "tray_slot"), st
+        ))
+
+    def test_tray_rim_is_stable_with_no_hands(self):
+        tray = ObjectTrack(label="tray", box=(230.0, 220.0, 410.0, 400.0), measured=True)
+        st = PredicateState()
+        s = step("object_stable(tray)", "tray", "rack")
+        for _ in range(3):
+            self.assertTrue(object_stable(ev(objects={"tray": tray}, hands=()), make_spec(), s, st))
+
+
 if __name__ == "__main__":
     unittest.main()

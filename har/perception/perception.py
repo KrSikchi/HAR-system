@@ -6,10 +6,14 @@ frame is:
 
 1. run the wrist extractor (pose every N frames; cached in between, with the
    person count from the last pose pass),
-2. **person gate** - when nobody is in frame, skip the detector entirely and
-   hand the trackers an empty detection list. That is a free frame-rate win:
-   the trackers coast, the FSMs hold, and nothing protocol-relevant can
-   happen without an operator anyway,
+2. **person gate** (optional, default OFF) - when enabled and nobody is in
+   frame, skip the detector entirely and hand the trackers an empty
+   detection list. It is a frame-rate win, but it is *off by default*: the
+   PTS-01 step 1 (``object_stable(tray)``) is a prop-only dwell that must
+   complete with nobody in frame, so prop colour detection has to run every
+   frame regardless of the pose result. Opt in with ``person_gate=True`` /
+   ``--person-gate`` when the pipeline is CPU-bound and a person is
+   guaranteed to be present whenever anything protocol-relevant happens,
 3. fan the detections through one :class:`SingleTargetTracker` per protocol
    label,
 4. advance one :class:`InteractionMachine` per label with the tracked box and
@@ -42,6 +46,7 @@ class PerceptionStack:
         frame_size: tuple[int, int],
         tracker_config: TrackerConfig | None = None,
         interaction_config: InteractionConfig | None = None,
+        person_gate: bool = False,
     ) -> None:
         self.detector = detector
         self.wrists = wrists
@@ -65,8 +70,10 @@ class PerceptionStack:
         #: Optional ``har.perception.rack.RackFrame``; when set and ready, the
         #: produced evidence carries ``rack_ready=True``.
         self.rack: Any = None
-        #: When True (default), no person in frame short-circuits detection.
-        self.person_gate = True
+        #: When True, no person in frame short-circuits object detection.
+        #: Default False: props (tray/lid/boxes) must be detected with zero
+        #: people in frame, otherwise PTS-01 step 1 can never complete.
+        self.person_gate = bool(person_gate)
         self._last_time: float | None = None
         self._fps = 0.0
 
@@ -80,6 +87,8 @@ class PerceptionStack:
         wrist_list = self.wrists.wrists(frame, frame_index)
         wrists_points = [w.point for w in wrist_list]
 
+        # Pose/wrists always run (later HOI steps need them) but they only
+        # gate the object detector when the optional person gate is enabled.
         person_present = True
         if self.person_gate:
             person_present = bool(getattr(self.wrists, "person_present", True))

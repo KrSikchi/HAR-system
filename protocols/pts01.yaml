@@ -90,16 +90,25 @@ zones:
     box: [0.08, 0.15, 0.92, 0.95]
 
   - id: tray_slot
-    # Tight footprint around the tray's rest position.
-    # Start state: lid ON tray with dark rim visible → tray detection fires.
-    # OPEN_TRAY requires lid centre to leave this box (slide horizontally).
+    # Footprint around the tray's rest position for the step-1-centred,
+    # top-down framing (black tray roughly mid-frame on the white sheet).
+    #
+    # INVARIANT: with the lid ON the tray (step-1 start state) the tray_lid
+    # centre MUST lie inside this box, so object_left_zone(tray_lid,
+    # tray_slot) stays FALSE and step 2 can never fire early (no
+    # OUT_OF_ORDER / SKIPPED while PRESENT_TRAY is still pending).
+    # Step 2 is only for the lid slid horizontally clear of this box.
+    #
+    # Was [0.34, 0.48, 0.66, 0.88]: y1=0.48 sat below a mid-frame lid centre
+    # (~0.45-0.5), so the resting lid read as "outside" -> false step 2.
+    # Verify on the live overlay: lid centre dot inside this box at rest.
     label: Tray stow position
-    box: [0.34, 0.48, 0.66, 0.88]
+    box: [0.30, 0.32, 0.70, 0.68]
 
   - id: zone_red
     # *** camera-RIGHT placement pad — red_box final home ***
     # x ∈ [0.70, 0.90]: right half of a typical top-down frame.
-    # Must NOT overlap tray_slot (x starts at 0.70 > tray_slot x2 0.66).
+    # Must NOT overlap tray_slot (x starts at 0.70 = tray_slot x2; touching only).
     # Calibrate so the centre of the placed red_box falls well inside.
     label: Red box placement pad (camera-right)
     box: [0.70, 0.50, 0.90, 0.80]
@@ -107,7 +116,7 @@ zones:
   - id: zone_blue
     # *** camera-LEFT placement pad — blue_box final home ***
     # x ∈ [0.10, 0.30]: left half of a typical top-down frame.
-    # Must NOT overlap tray_slot (x ends at 0.30 < tray_slot x1 0.34).
+    # Must NOT overlap tray_slot (x ends at 0.30 = tray_slot x1; touching only).
     # Calibrate so the centre of the placed blue_box falls well inside.
     label: Blue box placement pad (camera-left)
     box: [0.10, 0.50, 0.30, 0.80]
@@ -127,8 +136,9 @@ steps:
   - step_id: OPEN_TRAY
     index: 2
     title: Open the tray
-    # Slide — do NOT lift — the lid horizontally until its centre leaves
-    # tray_slot.  Keep the lid in frame for ~1 s (hold_frames=8 at 15 fps)
+    # With the lid ON the tray its centre lies INSIDE tray_slot and this
+    # predicate is false (see tray_slot zone comment).  Slide — do NOT lift —
+    # the lid horizontally until its centre leaves tray_slot.  Keep the lid in frame for ~1 s (hold_frames=8 at 15 fps)
     # before releasing so the predicate completes while the lid is visible.
     instruction: Slide the tray lid clear of the tray slot.
     predicate: object_left_zone(tray_lid, tray_slot)

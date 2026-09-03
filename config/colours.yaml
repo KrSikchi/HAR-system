@@ -41,6 +41,15 @@ colours:
   # slightly brighter. Keep S upper bound low (≤60) so white-sheet soft
   # shadows (S≈0) do not pass.
   # Raise V upper bound further (e.g. 130) if tray appears mid-grey on camera.
+  #
+  # STEP 1 NOTE: `tray` is the BLACK RIM visible around the yellow lid, not
+  # the lid itself (`tray_lid`). With the lid on, only the rim ring is
+  # tray-coloured, so its blob is much smaller than the whole tray. If the
+  # overlay shows no `tray` box on the rim under desk lighting, tune here:
+  #   * tray V upper bound 110 -> 130 (or 150 for a washed-out grey rim)
+  #   * tray S upper bound 60 -> 80 if the rim picks up a colour cast
+  #   * detector.min_area 300 -> 200 if the visible rim ring is thin
+  # Change the config, never the code.
   tray:
     ranges:
       - [[0, 0, 20], [180, 60, 110]]

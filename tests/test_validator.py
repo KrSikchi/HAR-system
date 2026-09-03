@@ -837,5 +837,74 @@ class ValidatorUiStatusTests(unittest.TestCase):
         self.assertEqual(round(validator.status().fps, 2), payload["fps"])
 
 
+@unittest.skipIf(load_protocol is None, "PyYAML is not installed")
+class ValidatorStep1LayoutTests(unittest.TestCase):
+    """Step-1 physical layout against the real ``protocols/pts01.yaml``.
+
+    Top-down camera, black tray centred on the sheet, yellow lid ON the tray
+    with the black rim visible, nobody in frame.  ``tray`` (rim) is measured
+    and stable; ``tray_lid`` centre is mid-frame.  Step 1 must complete and
+    step 2 must stay false the whole time (no OUT_OF_ORDER / SKIPPED).
+    Regression: the old tray_slot y1=0.48 put a mid-frame lid centre
+    *outside* the slot, which fired OPEN_TRAY while PRESENT_TRAY was pending.
+    """
+
+    STEP1_HOLD = 15
+
+    # Frame is 640x480. Lid ~ centred at (320, 232) i.e. (0.50, 0.48) - the
+    # boundary case that the old zone got wrong. Rim box surrounds it.
+    LID_ON_TRAY = (250.0, 172.0, 390.0, 292.0)
+    RIM = (220.0, 150.0, 420.0, 315.0)
+    LID_SLID_RIGHT = (470.0, 172.0, 610.0, 292.0)  # centre x = 540 = 0.84
+
+    def _frame(self, i: int, lid_box, hands=NO_HANDS) -> FrameEvidence:
+        return FrameEvidence(
+            frame_index=i,
+            t_rel=i / FPS,
+            frame_size=FRAME_SIZE,
+            objects={
+                "tray": ObjectTrack(label="tray", box=self.RIM, measured=True),
+                "tray_lid": ObjectTrack(label="tray_lid", box=lid_box, measured=True),
+            },
+            hands=hands,
+            hoi={"tray": "IDLE", "tray_lid": "IDLE"},
+            rack_ready=True,
+            fps=FPS,
+        )
+
+    def test_lid_on_tray_centre_is_inside_tray_slot(self):
+        spec = load_protocol(PTS01, FRAME_SIZE)
+        x1, y1, x2, y2 = spec.zone("tray_slot").box
+        cx = (self.LID_ON_TRAY[0] + self.LID_ON_TRAY[2]) / 2
+        cy = (self.LID_ON_TRAY[1] + self.LID_ON_TRAY[3]) / 2
+        self.assertTrue(x1 <= cx <= x2 and y1 <= cy <= y2, (cx, cy, (x1, y1, x2, y2)))
+
+    def test_step_one_completes_with_nobody_in_frame_and_step_two_stays_false(self):
+        validator = make_validator()
+        events: list[StepEvent] = []
+        for i in range(90):  # 6x step-1 hold; plenty of time for a false step 2
+            events.extend(validator.update(self._frame(i, self.LID_ON_TRAY)))
+        kinds = [(e.event, e.step_id) for e in events]
+        self.assertIn(("COMPLETED", "PRESENT_TRAY"), kinds)
+        self.assertEqual((), validator.violations)
+        self.assertEqual([], [k for k in kinds if k[0] in ("OUT_OF_ORDER", "SKIPPED")])
+        self.assertEqual("OPEN_TRAY", validator.current.step_id)
+        self.assertEqual("", validator.status().last_alert)
+
+    def test_sliding_the_lid_clear_after_step_one_completes_step_two(self):
+        validator = make_validator()
+        events: list[StepEvent] = []
+        for i in range(40):
+            events.extend(validator.update(self._frame(i, self.LID_ON_TRAY)))
+        self.assertEqual("OPEN_TRAY", validator.current.step_id)
+        for i in range(40, 70):
+            events.extend(validator.update(self._frame(i, self.LID_SLID_RIGHT)))
+        kinds = [(e.event, e.step_id) for e in events]
+        self.assertIn(("COMPLETED", "OPEN_TRAY"), kinds)
+        self.assertEqual((), validator.violations)
+        self.assertEqual("EXTRACT_RED", validator.current.step_id)
+
+
+
 if __name__ == "__main__":
     unittest.main()
